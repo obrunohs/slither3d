@@ -1422,82 +1422,49 @@ createNPCs();
 
 function createPlayer(){
 
-    const color =
-    snakeColors[selectedColorIndex];
+    const color = snakeColors[selectedColorIndex];
 
-    let nickname =
-    document.getElementById(
-        "nickname"
-    ).value.trim();
+    let nickname = document.getElementById("nickname").value.trim();
 
     if(nickname === ""){
-
         nickname = "Você";
-
     }
 
-    player =
-    new Snake(
-        nickname,
-        color,
-        true
-    );
-
+    player = new Snake(nickname, color, true);
     player.score = START_SCORE;
-
     player.growPoints = 0;
-
     player.boostSpend = 0;
 
     snakes.push(player);
-
     playerAlive = true;
 
     updateHud();
-
     updateOnlineRankingNow();
-
     setupDisconnectRemove();
-
 }
 
 function startGame(){
 
-    document.getElementById(
-        "menu"
-    ).style.display = "none";
+    document.getElementById("menu").style.display = "none";
 
     gameStarted = true;
 
     if(!player){
-
         createPlayer();
-
     }
-
 }
 
 function restartPlayer(){
 
-    document.getElementById(
-        "gameOver"
-    ).style.display = "none";
+    document.getElementById("gameOver").style.display = "none";
 
     if(player){
-
         removePlayerOnlineRanking();
-
         player.destroy();
-
-        snakes =
-        snakes.filter(
-            s => s !== player
-        );
-
+        snakes = snakes.filter(s => s !== player);
     }
 
     createPlayer();
-
 }
 
 function killPlayer(){
@@ -1507,22 +1474,13 @@ function killPlayer(){
     }
 
     playerAlive = false;
-
     player.alive = false;
 
     saveGlobalRanking();
-
     removePlayerOnlineRanking();
 
-    document.getElementById(
-        "finalScore"
-    ).innerText =
-    Math.floor(player.score);
-
-    document.getElementById(
-        "gameOver"
-    ).style.display = "flex";
-
+    document.getElementById("finalScore").innerText = Math.floor(player.score);
+    document.getElementById("gameOver").style.display = "flex";
 }
 
 function checkCollisions(){
@@ -1543,75 +1501,46 @@ function checkCollisions(){
                 continue;
             }
 
-            for(
-                let i = 1;
-                i < target.segments.length;
-                i++
-            ){
+            for(let i = 1; i < target.segments.length; i++){
 
-                const bodyPart =
-                target.segments[i];
-
-                const dist =
-                attacker.headPos.distanceTo(
-                    bodyPart.pos
-                );
+                const bodyPart = target.segments[i];
+                const dist = attacker.headPos.distanceTo(bodyPart.pos);
 
                 if(dist < 1.55){
 
                     attacker.explode();
-
                     target.addPoints(100);
 
                     if(attacker.isPlayer){
-
                         killPlayer();
-
                     }
 
                     if(target.isPlayer){
-
                         updateHud();
-
                         updateOnlineRankingNow();
-
                         saveGlobalRanking();
-
                     }
 
                     return;
-
                 }
-
             }
-
         }
-
     }
-
 }
 
 function updateNPCRespawn(){
 
     for(const s of snakes){
 
-        if(
-            !s.isPlayer &&
-            !s.alive
-        ){
+        if(!s.isPlayer && !s.alive){
 
             s.respawnTimer--;
 
             if(s.respawnTimer <= 0){
-
                 s.resetNPC();
-
             }
-
         }
-
     }
-
 }
 
 function updateBigFoodEffects(delta){
@@ -1620,30 +1549,17 @@ function updateBigFoodEffects(delta){
 
         if(food.big){
 
-            food.pulseTime +=
-            delta * 6;
+            food.pulseTime += delta * 6;
 
-            const pulse =
-            0.65 +
-            Math.sin(food.pulseTime)
-            * 0.35;
+            const pulse = 0.65 + Math.sin(food.pulseTime) * 0.35;
 
-            food.material.emissiveIntensity =
-            0.8 + pulse * 1.8;
+            food.material.emissiveIntensity = 0.8 + pulse * 1.8;
 
-            const scale =
-            1 + pulse * 0.25;
+            const scale = 1 + pulse * 0.25;
 
-            food.scale.set(
-                scale,
-                scale,
-                scale
-            );
-
+            food.scale.set(scale, scale, scale);
         }
-
     }
-
 }
 
 function updateHud(){
@@ -1652,59 +1568,45 @@ function updateHud(){
         return;
     }
 
-    document.getElementById(
-        "size"
-    ).innerText =
-    player.getSize();
-
-    document.getElementById(
-        "score"
-    ).innerText =
-    Math.floor(player.score);
-
+    document.getElementById("size").innerText = player.getSize();
+    document.getElementById("score").innerText = Math.floor(player.score);
 }
 
 function updateOnlineRankingNow(){
 
-    if(
-        !player ||
-        !playerAlive
-    ){
+    if(!player || !playerAlive){
         return;
     }
 
-    firebaseSet(
+    if(!window.firebaseSet || !window.firebaseRef || !window.firebaseDB){
+        return;
+    }
 
-        firebaseRef(
+    window.firebaseSet(
+        window.firebaseRef(
             window.firebaseDB,
             "playersOnline/" + playerId
         ),
-
         {
             id: playerId,
             name: player.name,
             score: Math.floor(player.score)
         }
-
     );
-
 }
 
 function removePlayerOnlineRanking(){
 
-    if(!window.firebaseRemove){
+    if(!window.firebaseRemove || !window.firebaseRef || !window.firebaseDB){
         return;
     }
 
-    firebaseRemove(
-
-        firebaseRef(
+    window.firebaseRemove(
+        window.firebaseRef(
             window.firebaseDB,
             "playersOnline/" + playerId
         )
-
     );
-
 }
 
 function saveGlobalRanking(){
@@ -1713,240 +1615,160 @@ function saveGlobalRanking(){
         return;
     }
 
-    firebaseSet(
+    if(!window.firebaseSet || !window.firebaseRef || !window.firebaseDB){
+        return;
+    }
 
-        firebaseRef(
+    window.firebaseSet(
+        window.firebaseRef(
             window.firebaseDB,
             "globalRanking/" + player.name
         ),
-
         {
             name: player.name,
             score: Math.floor(player.score)
         }
-
     );
-
 }
 
 function setupDisconnectRemove(){
 
     if(
-        !window.firebaseOnDisconnect
+        !window.firebaseOnDisconnect ||
+        !window.firebaseRef ||
+        !window.firebaseDB
     ){
         return;
     }
 
-    firebaseOnDisconnect(
-
-        firebaseRef(
+    window.firebaseOnDisconnect(
+        window.firebaseRef(
             window.firebaseDB,
             "playersOnline/" + playerId
         )
-
     ).remove();
-
 }
 
 function listenOnlineRanking(){
 
-    window.firebaseOnValue(
-
-        window.firebaseRef(
-            window.firebaseDB,
-            "playersOnline"
-        ),
-
-        (snapshot) => {
-        ),
-
-        (snapshot) => {
-
-            const data =
-            snapshot.val();
-
-            if(!data){
-
-                document.getElementById(
-                    "rankList"
-                ).innerHTML =
-                "Vazio";
-
-                return;
-
-            }
-
-            const players =
-            Object.values(data);
-
-            players.sort(
-                (a,b) =>
-                b.score - a.score
-            );
-
-            const top10 =
-            players.slice(0,10);
-
-            let html = "";
-
-            top10.forEach((p,i) => {
-
-                const crown =
-                i === 0
-                ? "👑 "
-                : "";
-
-                html +=
-                `${i + 1}. ${crown}${p.name} - ${p.score}<br>`;
-
-            });
-
-            document.getElementById(
-                "rankList"
-            ).innerHTML = html;
-
-        }
-
-    );
-
-}
-
-function listenGlobalRanking(){
-
-    firebaseOnValue(
-
-        window.firebaseRef(
-            window.firebaseDB,
-            "globalRanking"
-        ),
-
-        (snapshot) => {
-
-            const data =
-            snapshot.val();
-
-            if(!data){
-
-                document.getElementById(
-                    "globalRankList"
-                ).innerHTML =
-                "Sem recordes";
-
-                return;
-
-            }
-
-            const players =
-            Object.values(data);
-
-            players.sort(
-                (a,b) =>
-                b.score - a.score
-            );
-
-            const top10 =
-            players.slice(0,10);
-
-            let html = "";
-
-            top10.forEach((p,i) => {
-
-                const crown =
-                i === 0
-                ? "👑 "
-                : "";
-
-                html +=
-                `${i + 1}. ${crown}${p.name} - ${p.score}<br>`;
-
-            });
-
-            document.getElementById(
-                "globalRankList"
-            ).innerHTML = html;
-
-        }
-
-    );
-
-}
-
-listenOnlineRanking();
-
-listenGlobalRanking();
-
-const keys = {};
-
-window.addEventListener(
-"keydown",
-e => {
-
-    keys[
-        e.key.toLowerCase()
-    ] = true;
-
-});
-
-window.addEventListener(
-"keyup",
-e => {
-
-    keys[
-        e.key.toLowerCase()
-    ] = false;
-
-});
-
-function updateCamera(){
-
     if(
-        !player ||
-        !playerAlive
+        !window.firebaseOnValue ||
+        !window.firebaseRef ||
+        !window.firebaseDB
     ){
         return;
     }
 
-    const head =
-    player.headPos;
+    window.firebaseOnValue(
+        window.firebaseRef(
+            window.firebaseDB,
+            "playersOnline"
+        ),
+        (snapshot) => {
 
-    camera.position.x +=
-    (
-        head.x -
-        camera.position.x
-    ) * 0.08;
+            const data = snapshot.val() || {};
+            const players = Object.values(data);
 
-    camera.position.y +=
-    (
-        20 -
-        camera.position.y
-    ) * 0.08;
+            players.sort((a, b) => (b.score || 0) - (a.score || 0));
 
-    camera.position.z +=
-    (
-        (
-            head.z - 22
-        ) -
-        camera.position.z
-    ) * 0.08;
-
-    camera.lookAt(
-        head.x,
-        0,
-        head.z
+            updateOnlineRanking(players.slice(0, 10));
+        }
     );
-
 }
-    function animate(){
 
-    requestAnimationFrame(
-        animate
+function listenGlobalRanking(){
+
+    if(
+        !window.firebaseOnValue ||
+        !window.firebaseRef ||
+        !window.firebaseDB
+    ){
+        return;
+    }
+
+    window.firebaseOnValue(
+        window.firebaseRef(
+            window.firebaseDB,
+            "globalRanking"
+        ),
+        (snapshot) => {
+
+            const data = snapshot.val();
+
+            if(!data){
+
+                document.getElementById("globalRankList").innerHTML = "Sem recordes";
+                return;
+            }
+
+            const players = Object.values(data);
+
+            players.sort((a, b) => (b.score || 0) - (a.score || 0));
+
+            const top10 = players.slice(0, 10);
+
+            let html = "";
+
+            top10.forEach((p, i) => {
+
+                const crown = i === 0 ? "👑 " : "";
+
+                html += `${i + 1}. ${crown}${p.name} - ${p.score}<br>`;
+            });
+
+            document.getElementById("globalRankList").innerHTML = html;
+        }
     );
+}
 
-    const now =
-    performance.now();
+function startFirebaseRankings(){
 
-    const delta =
-    (now - lastTime) / 1000;
+    if(
+        !window.firebaseOnValue ||
+        !window.firebaseRef ||
+        !window.firebaseDB
+    ){
+        setTimeout(startFirebaseRankings, 200);
+        return;
+    }
+
+    listenOnlineRanking();
+    listenGlobalRanking();
+}
+
+startFirebaseRankings();
+
+const keys = {};
+
+window.addEventListener("keydown", e => {
+    keys[e.key.toLowerCase()] = true;
+});
+
+window.addEventListener("keyup", e => {
+    keys[e.key.toLowerCase()] = false;
+});
+
+function updateCamera(){
+
+    if(!player || !playerAlive){
+        return;
+    }
+
+    const head = player.headPos;
+
+    camera.position.x += (head.x - camera.position.x) * 0.08;
+    camera.position.y += (20 - camera.position.y) * 0.08;
+    camera.position.z += ((head.z - 22) - camera.position.z) * 0.08;
+
+    camera.lookAt(head.x, 0, head.z);
+}
+
+function animate(){
+
+    requestAnimationFrame(animate);
+
+    const now = performance.now();
+    const delta = (now - lastTime) / 1000;
 
     lastTime = now;
 
@@ -1954,84 +1776,43 @@ function updateCamera(){
 
         snakes.forEach(s => {
 
-            if(
-                !s.isPlayer ||
-                playerAlive
-            ){
-
+            if(!s.isPlayer || playerAlive){
                 s.update(delta);
-
             }
-
         });
 
         checkCollisions();
-
         updateNPCRespawn();
-
         updateBigFoodEffects(delta);
 
-        if(
-            player &&
-            playerAlive &&
-            now - lastOnlineUpdate > 700
-        ){
+        if(player && playerAlive && now - lastOnlineUpdate > 700){
 
             updateOnlineRankingNow();
-
             saveGlobalRanking();
 
             lastOnlineUpdate = now;
-
         }
 
         updateCamera();
-
     }
 
-    renderer.render(
-        scene,
-        camera
-    );
-
+    renderer.render(scene, camera);
 }
 
-camera.position.set(
-0,
-20,
--22
-);
-
-camera.lookAt(
-0,
-0,
-0
-);
+camera.position.set(0, 20, -22);
+camera.lookAt(0, 0, 0);
 
 animate();
 
-window.addEventListener(
-"resize",
-() => {
+window.addEventListener("resize", () => {
 
-    camera.aspect =
-    innerWidth / innerHeight;
-
+    camera.aspect = innerWidth / innerHeight;
     camera.updateProjectionMatrix();
-
-    renderer.setSize(
-        innerWidth,
-        innerHeight
-    );
-
+    renderer.setSize(innerWidth, innerHeight);
 });
 
-window.addEventListener(
-"beforeunload",
-() => {
-
+window.addEventListener("beforeunload", () => {
     removePlayerOnlineRanking();
-
 });
 
 </script>
@@ -2039,54 +1820,50 @@ window.addEventListener(
 <script type="module">
 
 import {
-initializeApp
+    initializeApp
 }
 from
 "https://www.gstatic.com/firebasejs/12.12.1/firebase-app.js";
 
 import {
-  getDatabase,
-  ref,
-  set,
-  get,
-  onValue,
-  remove,
-  update,
-  onDisconnect
+    getDatabase,
+    ref,
+    set,
+    get,
+    onValue,
+    remove,
+    update,
+    onDisconnect
 }
 from
 "https://www.gstatic.com/firebasejs/12.12.1/firebase-database.js";
 
 const firebaseConfig = {
 
-apiKey:
-"AIzaSyDyM6_nMlHtle4Z030VmLS7_ZPm4Cw4ww8",
+    apiKey:
+    "AIzaSyDyM6_nMlHtle4Z030VmLS7_ZPm4Cw4ww8",
 
-authDomain:
-"slither3d-54683.firebaseapp.com",
+    authDomain:
+    "slither3d-54683.firebaseapp.com",
 
-databaseURL:
-"https://slither3d-54683-default-rtdb.firebaseio.com",
+    databaseURL:
+    "https://slither3d-54683-default-rtdb.firebaseio.com",
 
-projectId:
-"slither3d-54683",
+    projectId:
+    "slither3d-54683",
 
-storageBucket:
-"slither3d-54683.firebasestorage.app",
+    storageBucket:
+    "slither3d-54683.firebasestorage.app",
 
-messagingSenderId:
-"747917317954",
+    messagingSenderId:
+    "747917317954",
 
-appId:
-"1:747917317954:web:5516fc0d798a3b5c5f5adb"
-
+    appId:
+    "1:747917317954:web:5516fc0d798a3b5c5f5adb"
 };
 
-const app =
-initializeApp(firebaseConfig);
-
-const db =
-getDatabase(app);
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
 
 window.firebaseDB = db;
 window.firebaseRef = ref;
