@@ -1649,6 +1649,33 @@ function setupDisconnectRemove(){
     ).remove();
 }
 
+function updateOnlineRanking(players){
+
+    const rankList = document.getElementById("rankList");
+
+    if(!rankList){
+        return;
+    }
+
+    if(!players || players.length === 0){
+        rankList.innerHTML = "Sem jogadores online";
+        return;
+    }
+
+    let html = "";
+
+    players.forEach((p, i) => {
+
+        const crown = i === 0 ? "👑 " : "";
+        const name = p.name || "Jogador";
+        const score = p.score || 0;
+
+        html += `${i + 1}. ${crown}${name} - ${score}<br>`;
+    });
+
+    rankList.innerHTML = html;
+}
+
 function listenOnlineRanking(){
 
     if(
@@ -1677,7 +1704,6 @@ function listenOnlineRanking(){
 }
 
 function listenGlobalRanking(){
-
     if(
         !window.firebaseOnValue ||
         !window.firebaseRef ||
