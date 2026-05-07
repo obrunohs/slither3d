@@ -1750,7 +1750,7 @@ function setupDisconnectRemove(){
 
 function listenOnlineRanking(){
 
-    firebaseOnValue(
+    window.firebaseOnValue(
 
         firebaseRef(
             window.firebaseDB,
@@ -1812,7 +1812,7 @@ function listenGlobalRanking(){
 
     firebaseOnValue(
 
-        firebaseRef(
+        window.firebaseRef(
             window.firebaseDB,
             "globalRanking"
         ),
