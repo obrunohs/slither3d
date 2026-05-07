@@ -1904,7 +1904,8 @@ function updateCamera(){
     const targetZ =
         head.z - dirZ * camDistance;
 
-    const targetY = camHeight;
+    const targetY =
+        camHeight;
 
     camera.position.x +=
         (targetX - camera.position.x) * 0.02;
@@ -1943,10 +1944,14 @@ function updateCamera(){
 }
 
 function animate(){
+
     requestAnimationFrame(animate);
 
-    const now = performance.now();
-    const delta = (now - lastTime) / 1000;
+    const now =
+    performance.now();
+
+    const delta =
+    (now - lastTime) / 1000;
 
     lastTime = now;
 
@@ -1960,128 +1965,32 @@ function animate(){
         });
 
         checkCollisions();
+
         updateNPCRespawn();
+
         updateBigFoodEffects(delta);
 
-        if(player && playerAlive && now - lastOnlineUpdate > 700){
+        if(
+            player &&
+            playerAlive &&
+            now - lastOnlineUpdate > 700
+        ){
 
             updateOnlineRankingNow();
+
             saveGlobalRanking();
 
             lastOnlineUpdate = now;
         }
 
-       function updateCamera(){
-
-    if(!player || !playerAlive){
-        return;
+        updateCamera();
     }
 
-    const head = player.headPos;
-
-    let dirX = 0;
-    let dirZ = 1;
-
-    if(player.segments.length > 1){
-
-        const neck = player.segments[1].pos;
-
-        dirX = head.x - neck.x;
-        dirZ = head.z - neck.z;
-
-        const len = Math.hypot(dirX, dirZ);
-
-        if(len > 0.001){
-            dirX /= len;
-            dirZ /= len;
-        }
-    }
-
-    const camDistance = 26;
-    const camHeight = 18;
-
-    const targetX =
-        head.x - dirX * camDistance;
-
-    const targetZ =
-        head.z - dirZ * camDistance;
-
-    const targetY = camHeight;
-
-    camera.position.x +=
-        (targetX - camera.position.x) * 0.08;
-
-    camera.position.y +=
-        (targetY - camera.position.y) * 0.08;
-
-    camera.position.z +=
-        (targetZ - camera.position.z) * 0.08;
-
-    const lookX =
-        head.x + dirX * 10;
-
-    const lookZ =
-        head.z + dirZ * 10;
-
-    camera.lookAt(
-        lookX,
-        0,
-        lookZ
+    renderer.render(
+        scene,
+        camera
     );
 }
-animate();
-
-window.addEventListener("resize", () => {
-
-    camera.aspect = innerWidth / innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(innerWidth, innerHeight);
-});
-
-window.addEventListener("beforeunload", () => {
-    removePlayerOnlineRanking();
-});
-
-</script>
-
-<script type="module">
-
-import {
-    initializeApp
-}
-from
-"https://www.gstatic.com/firebasejs/12.12.1/firebase-app.js";
-
-import {
-    getDatabase,
-    ref,
-    set,
-    get,
-    onValue,
-    remove,
-    update,
-    onDisconnect
-}
-from
-"https://www.gstatic.com/firebasejs/12.12.1/firebase-database.js";
-
-const firebaseConfig = {
-
-    apiKey:
-    "AIzaSyDyM6_nMlHtle4Z030VmLS7_ZPm4Cw4ww8",
-
-    authDomain:
-    "slither3d-54683.firebaseapp.com",
-
-    databaseURL:
-    "https://slither3d-54683-default-rtdb.firebaseio.com",
-
-    projectId:
-    "slither3d-54683",
-
-    storageBucket:
-    "slither3d-54683.firebasestorage.app",
-
     messagingSenderId:
     "747917317954",
 
