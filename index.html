@@ -1,0 +1,1002 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<title>Snake 3D IO</title>
+
+<style>
+body{
+    margin:0;
+    overflow:hidden;
+    background:#111;
+    font-family:Arial;
+}
+
+#menu, #gameOver{
+    position:absolute;
+    inset:0;
+    background:rgba(0,0,0,0.88);
+    color:white;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    z-index:20;
+}
+
+#gameOver{ display:none; }
+
+button{
+    padding:12px 22px;
+    margin:8px;
+    font-size:18px;
+    border:none;
+    border-radius:10px;
+    cursor:pointer;
+}
+
+#nickname{
+    padding:12px;
+    font-size:18px;
+    border-radius:10px;
+    border:none;
+    text-align:center;
+    margin-bottom:10px;
+}
+
+#colorPicker{
+    display:flex;
+    align-items:center;
+    gap:15px;
+    margin:20px;
+}
+
+.arrowBtn{
+    width:55px;
+    height:55px;
+    border-radius:50%;
+    font-size:28px;
+    background:white;
+}
+
+#preview{
+    width:360px;
+    height:120px;
+    background:rgba(255,255,255,0.08);
+    border-radius:20px;
+}
+
+#hud{
+    position:absolute;
+    top:10px;
+    left:10px;
+    color:white;
+    background:rgba(0,0,0,0.55);
+    padding:10px;
+    border-radius:10px;
+    z-index:10;
+}
+
+#rank{
+    position:absolute;
+    top:10px;
+    right:10px;
+    color:white;
+    background:rgba(0,0,0,0.55);
+    padding:10px;
+    border-radius:10px;
+    z-index:10;
+    width:250px;
+}
+</style>
+</head>
+
+<body>
+
+<div id="menu">
+    <h1>Snake 3D IO</h1>
+
+    <input id="nickname" placeholder="Digite seu nickname" maxlength="14">
+
+    <div id="colorPicker">
+        <button class="arrowBtn" onclick="prevColor()">‹</button>
+        <canvas id="preview" width="360" height="120"></canvas>
+        <button class="arrowBtn" onclick="nextColor()">›</button>
+    </div>
+
+    <button onclick="startGame()">Iniciar</button>
+</div>
+
+<div id="gameOver">
+    <h1>Você morreu!</h1>
+    <p>Pontos: <span id="finalScore">0</span></p>
+    <button onclick="restartPlayer()">Jogar novamente</button>
+</div>
+
+<div id="hud">
+    <h2>Snake 3D IO</h2>
+    <p>Tamanho: <span id="size">5</span></p>
+    <p>Pontos: <span id="score">350</span></p>
+    <p>W acelera | perde 1 bolinha a cada 70 pontos gastos</p>
+</div>
+
+<div id="rank">
+    <h3>Ranking</h3>
+    <div id="rankList"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
+
+<script>
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x101010);
+
+const camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.1, 3000);
+
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+
+const light = new THREE.DirectionalLight(0xffffff, 1.3);
+light.position.set(100,180,80);
+scene.add(light);
+
+const MAP_SIZE = 1000;
+const HALF_MAP = MAP_SIZE / 2;
+
+const POINTS_PER_FOOD = 3;
+const BIG_FOOD_POINTS = 28;
+const POINTS_TO_GROW = 70;
+const START_SEGMENTS = 5;
+const START_SCORE = START_SEGMENTS * POINTS_TO_GROW;
+const BOOST_COST_PER_SECOND = 15;
+const MIN_SEGMENTS_TO_BOOST = 3;
+const NPC_COUNT = 45;
+
+const floor = new THREE.Mesh(
+    new THREE.BoxGeometry(MAP_SIZE,1,MAP_SIZE),
+    new THREE.MeshStandardMaterial({color:0x222222})
+);
+floor.position.y = -0.55;
+scene.add(floor);
+
+const borderMat = new THREE.MeshStandardMaterial({color:0x444444});
+
+function border(x,z,w,d){
+    const b = new THREE.Mesh(new THREE.BoxGeometry(w,4,d), borderMat);
+    b.position.set(x,1,z);
+    scene.add(b);
+}
+
+border(0, HALF_MAP, MAP_SIZE, 3);
+border(0, -HALF_MAP, MAP_SIZE, 3);
+border(HALF_MAP, 0, 3, MAP_SIZE);
+border(-HALF_MAP, 0, 3, MAP_SIZE);
+
+let foods = [];
+let snakes = [];
+let player = null;
+let gameStarted = false;
+let playerAlive = false;
+
+let lastTime = performance.now();
+let groupFoodTimer = 0;
+let bigFoodTimer = 0;
+let npcAttackTimer = 0;
+
+const npcNames = [
+    "Shadow","Hunter","Blaze","Storm","Venom","Rex","Ghost","Turbo","Rocket",
+    "Frost","Viper","Dash","Pixel","Raven","Wolf","Falcon","Ace","Nitro",
+    "Phantom","Crusher","Spike","Bolt","Comet","Legend","SnakeBoss","Cyber",
+    "Titan","Alpha","Omega","Flash","Blade","Nova","Rapid","Inferno","Drift",
+    "Skull","Cobra","Max","Zero","Lucky","Eagle","Chaos","Knight","Dragon","Toxic"
+];
+
+const snakeColors = [
+    0x00ff88,
+    0x4488ff,
+    0xff4444,
+    0xffff44,
+    0xff44ff,
+    0xffffff,
+    0x00ffff,
+    0xff8800
+];
+
+let selectedColorIndex = 0;
+
+function prevColor(){
+    selectedColorIndex--;
+    if(selectedColorIndex < 0) selectedColorIndex = snakeColors.length - 1;
+}
+
+function nextColor(){
+    selectedColorIndex++;
+    if(selectedColorIndex >= snakeColors.length) selectedColorIndex = 0;
+}
+
+const previewCanvas = document.getElementById("preview");
+const pctx = previewCanvas.getContext("2d");
+
+function drawPreview(){
+    pctx.clearRect(0,0,previewCanvas.width,previewCanvas.height);
+
+    const time = performance.now() * 0.004;
+    const color = "#" + snakeColors[selectedColorIndex].toString(16).padStart(6,"0");
+
+    pctx.fillStyle = "rgba(255,255,255,0.06)";
+    pctx.fillRect(0,0,previewCanvas.width,previewCanvas.height);
+
+    for(let i = 0; i < 5; i++){
+        const x = 80 + i * 45;
+        const y = 60 + Math.sin(time + i * 0.8) * 18;
+
+        pctx.beginPath();
+        pctx.arc(x,y,18,0,Math.PI*2);
+        pctx.fillStyle = color;
+        pctx.fill();
+
+        pctx.strokeStyle = "white";
+        pctx.lineWidth = 2;
+        pctx.stroke();
+    }
+
+    requestAnimationFrame(drawPreview);
+}
+
+drawPreview();
+
+function createNameSprite(text){
+    const canvas = document.createElement("canvas");
+    canvas.width = 256;
+    canvas.height = 64;
+
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    ctx.font = "bold 28px Arial";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+
+    ctx.fillStyle = "rgba(255,255,255,0.72)";
+    ctx.strokeStyle = "rgba(0,0,0,0.55)";
+    ctx.lineWidth = 4;
+
+    ctx.strokeText(text,128,32);
+    ctx.fillText(text,128,32);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    const material = new THREE.SpriteMaterial({
+        map:texture,
+        transparent:true,
+        depthWrite:false
+    });
+
+    const sprite = new THREE.Sprite(material);
+    sprite.scale.set(8,2,1);
+
+    scene.add(sprite);
+    return sprite;
+}
+
+function randomPos(){
+    return new THREE.Vector3(
+        (Math.random() - 0.5) * (MAP_SIZE - 60),
+        0,
+        (Math.random() - 0.5) * (MAP_SIZE - 60)
+    );
+}
+
+function createFood(pos = null, value = POINTS_PER_FOOD, big = false){
+    const material = new THREE.MeshStandardMaterial({
+        color: big ? 0xffd700 : new THREE.Color(Math.random(), Math.random(), Math.random()),
+        emissive: big ? 0xffd700 : 0x000000,
+        emissiveIntensity: big ? 1.2 : 0
+    });
+
+    const food = new THREE.Mesh(
+        new THREE.SphereGeometry(big ? 0.9 : 0.35, big ? 18 : 12, big ? 18 : 12),
+        material
+    );
+
+    food.position.copy(pos || randomPos());
+    food.position.y = big ? 0.9 : 0.35;
+    food.value = value;
+    food.big = big;
+    food.pulseTime = Math.random() * 10;
+
+    scene.add(food);
+    foods.push(food);
+}
+
+function spawnFoodGroup(){
+    for(let i = 0; i < 50; i++) createFood();
+}
+
+function spawnBigFood(){
+    createFood(randomPos(), BIG_FOOD_POINTS, true);
+}
+
+for(let i = 0; i < 900; i++) createFood();
+
+class Snake{
+    constructor(name, color, isPlayer = false){
+        this.name = name;
+        this.color = color;
+        this.isPlayer = isPlayer;
+
+        this.segments = [];
+        this.path = [];
+
+        this.angle = Math.random() * Math.PI * 2;
+        this.speed = 0.18;
+
+        this.score = START_SCORE;
+        this.growPoints = 0;
+        this.boostSpend = 0;
+
+        this.alive = true;
+        this.respawnTimer = 0;
+        this.isBoosting = false;
+
+        this.targetFood = null;
+        this.changeTargetTimer = 0;
+
+        this.boostCooldown = 3 + Math.random() * 8;
+        this.boostDuration = 0;
+
+        this.attackTarget = null;
+        this.attackTime = 0;
+
+        this.headPos = randomPos();
+
+        this.nameSprite = createNameSprite(this.name);
+
+        for(let i = 0; i < START_SEGMENTS; i++){
+            this.addSegment(true);
+        }
+    }
+
+    createSegmentMaterial(){
+        return new THREE.MeshStandardMaterial({
+            color:this.color,
+            emissive:this.color,
+            emissiveIntensity:0
+        });
+    }
+
+    addSegment(initial = false){
+        let pos;
+
+        if(initial || this.segments.length === 0){
+            pos = this.headPos.clone();
+        }else{
+            const tail = this.segments[this.segments.length - 1];
+            pos = tail.pos.clone();
+        }
+
+        const mesh = new THREE.Mesh(
+            new THREE.SphereGeometry(1,20,20),
+            this.createSegmentMaterial()
+        );
+
+        mesh.position.copy(pos);
+        mesh.position.y = 1;
+        scene.add(mesh);
+
+        this.segments.push({
+            mesh:mesh,
+            pos:pos.clone()
+        });
+    }
+
+    removeLastSegment(){
+        if(this.segments.length <= 2) return;
+
+        const last = this.segments.pop();
+        scene.remove(last.mesh);
+    }
+
+    removeAll(){
+        this.segments.forEach(s => scene.remove(s.mesh));
+        this.segments = [];
+        this.path = [];
+
+        if(this.nameSprite){
+            scene.remove(this.nameSprite);
+        }
+    }
+
+    resetNPC(){
+        this.removeAll();
+
+        this.headPos = randomPos();
+        this.angle = Math.random() * Math.PI * 2;
+        this.score = START_SCORE;
+        this.growPoints = 0;
+        this.boostSpend = 0;
+        this.alive = true;
+        this.respawnTimer = 0;
+        this.targetFood = null;
+        this.path = [];
+        this.isBoosting = false;
+        this.attackTarget = null;
+        this.attackTime = 0;
+        this.boostCooldown = 3 + Math.random() * 8;
+        this.boostDuration = 0;
+
+        this.nameSprite = createNameSprite(this.name);
+
+        for(let i = 0; i < START_SEGMENTS; i++){
+            this.addSegment(true);
+        }
+    }
+
+    getSize(){
+        return this.segments.length;
+    }
+
+    addPoints(amount){
+        this.score += amount;
+        this.growPoints += amount;
+
+        while(this.growPoints >= POINTS_TO_GROW){
+            this.growPoints -= POINTS_TO_GROW;
+            this.addSegment(false);
+        }
+    }
+
+    canBoost(){
+        return this.getSize() >= MIN_SEGMENTS_TO_BOOST && this.score >= POINTS_TO_GROW;
+    }
+
+    spendBoost(delta){
+        this.boostSpend += BOOST_COST_PER_SECOND * delta;
+
+        if(this.boostSpend >= POINTS_TO_GROW){
+            this.boostSpend -= POINTS_TO_GROW;
+
+            if(this.getSize() > 2){
+                this.score -= POINTS_TO_GROW;
+                if(this.score < 0) this.score = 0;
+
+                this.removeLastSegment();
+
+                if(this.isPlayer) updateHud();
+            }
+        }
+    }
+
+    setGlow(active){
+        const intensity = active ? 1.4 : 0;
+
+        for(const seg of this.segments){
+            seg.mesh.material.emissiveIntensity = intensity;
+        }
+    }
+
+    updateNameSprite(){
+        if(!this.nameSprite || !this.alive) return;
+
+        this.nameSprite.position.set(
+            this.headPos.x,
+            4.2,
+            this.headPos.z
+        );
+
+        this.nameSprite.lookAt(camera.position);
+    }
+
+    update(delta){
+        if(!this.alive) return;
+
+        if(this.isPlayer){
+            this.updatePlayer(delta);
+        }else{
+            this.updateAI(delta);
+        }
+
+        this.setGlow(this.isBoosting);
+
+        const dir = new THREE.Vector3(
+            Math.sin(this.angle),
+            0,
+            Math.cos(this.angle)
+        );
+
+        this.headPos.add(dir.multiplyScalar(this.speed));
+        this.keepInsideMap();
+
+        this.path.unshift(this.headPos.clone());
+
+        const spacing = 8;
+        const maxPath = this.segments.length * spacing + 120;
+
+        if(this.path.length > maxPath){
+            this.path.length = maxPath;
+        }
+
+        for(let i = 0; i < this.segments.length; i++){
+            const index = i * spacing;
+
+            if(this.path[index]){
+                this.segments[i].pos.copy(this.path[index]);
+            }else{
+                const tail = this.segments[this.segments.length - 1];
+                this.segments[i].pos.copy(tail.pos);
+            }
+
+            this.segments[i].mesh.position.copy(this.segments[i].pos);
+            this.segments[i].mesh.position.y = 1;
+        }
+
+        this.updateNameSprite();
+        this.eatFood();
+    }
+
+    updatePlayer(delta){
+        if(keys["a"]) this.angle += 0.045;
+        if(keys["d"]) this.angle -= 0.045;
+
+        if(keys["w"] && this.canBoost()){
+            this.speed = 0.34;
+            this.isBoosting = true;
+            this.spendBoost(delta);
+        }else{
+            this.speed = 0.22;
+            this.isBoosting = false;
+            this.boostSpend = 0;
+        }
+    }
+
+    updateAI(delta){
+        let target = null;
+        let flee = false;
+        let chasePlayer = false;
+
+        if(this.attackTarget && (!this.attackTarget.alive || this.attackTime <= 0)){
+            this.attackTarget = null;
+            this.attackTime = 0;
+        }
+
+        if(this.attackTarget){
+            target = this.attackTarget.headPos.clone();
+            chasePlayer = true;
+            this.attackTime -= delta;
+        }
+
+        if(!target && player && playerAlive){
+            const distPlayer = this.headPos.distanceTo(player.headPos);
+
+            if(distPlayer < 55){
+                if(player.getSize() > this.getSize()){
+                    target = player.headPos.clone();
+                    flee = true;
+                }else if(this.getSize() > player.getSize()){
+                    target = player.headPos.clone();
+                    chasePlayer = true;
+                }
+            }
+        }
+
+        if(!target){
+            this.changeTargetTimer--;
+
+            if(!this.targetFood || this.changeTargetTimer <= 0 || !foods.includes(this.targetFood)){
+                this.targetFood = this.findNearestFood();
+                this.changeTargetTimer = 100 + Math.random() * 100;
+            }
+
+            if(this.targetFood){
+                target = this.targetFood.position.clone();
+            }
+        }
+
+        if(target){
+            let dx = target.x - this.headPos.x;
+            let dz = target.z - this.headPos.z;
+
+            if(flee){
+                dx *= -1;
+                dz *= -1;
+            }
+
+            const desiredAngle = Math.atan2(dx, dz);
+            let diff = desiredAngle - this.angle;
+            diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+
+            this.angle += diff * 0.10;
+        }
+
+        this.manageNPCBoost(delta, flee, chasePlayer);
+    }
+
+    manageNPCBoost(delta, flee, chasePlayer){
+        this.boostCooldown -= delta;
+
+        let wantsBoost = false;
+
+        if(this.boostDuration > 0){
+            this.boostDuration -= delta;
+            wantsBoost = true;
+        }else if(this.boostCooldown <= 0 && this.canBoost()){
+            if(flee || chasePlayer || this.attackTarget){
+                this.boostDuration = 1.2 + Math.random() * 1.2;
+                this.boostCooldown = 8 + Math.random() * 14;
+                wantsBoost = true;
+            }else if(Math.random() < 0.18){
+                this.boostDuration = 0.6 + Math.random() * 0.8;
+                this.boostCooldown = 12 + Math.random() * 18;
+                wantsBoost = true;
+            }else{
+                this.boostCooldown = 5 + Math.random() * 8;
+            }
+        }
+
+        if(wantsBoost && this.canBoost()){
+            this.speed = 0.34;
+            this.isBoosting = true;
+            this.spendBoost(delta);
+        }else{
+            this.speed = 0.22;
+            this.isBoosting = false;
+            this.boostSpend = 0;
+        }
+    }
+
+    findNearestFood(){
+        let best = null;
+        let bestDist = Infinity;
+
+        for(const food of foods){
+            const d = this.headPos.distanceTo(food.position);
+
+            if(d < bestDist){
+                bestDist = d;
+                best = food;
+            }
+        }
+
+        return best;
+    }
+
+    keepInsideMap(){
+        const limit = HALF_MAP - 6;
+
+        if(this.headPos.x > limit){
+            this.headPos.x = limit;
+            this.angle = -this.angle;
+        }
+
+        if(this.headPos.x < -limit){
+            this.headPos.x = -limit;
+            this.angle = -this.angle;
+        }
+
+        if(this.headPos.z > limit){
+            this.headPos.z = limit;
+            this.angle += Math.PI;
+        }
+
+        if(this.headPos.z < -limit){
+            this.headPos.z = -limit;
+            this.angle += Math.PI;
+        }
+    }
+
+    eatFood(){
+        for(let i = foods.length - 1; i >= 0; i--){
+            const food = foods[i];
+
+            if(this.headPos.distanceTo(food.position) < (food.big ? 2.1 : 1.5)){
+                scene.remove(food);
+                foods.splice(i,1);
+
+                this.addPoints(food.value);
+
+                if(!food.big){
+                    createFood();
+                }
+
+                if(this.isPlayer){
+                    updateHud();
+                }
+
+                if(!this.isPlayer){
+                    this.targetFood = null;
+                }
+            }
+        }
+    }
+
+    explode(){
+        for(const seg of this.segments){
+            for(let i = 0; i < 3; i++){
+                const p = seg.pos.clone();
+
+                p.x += (Math.random() - 0.5) * 3;
+                p.z += (Math.random() - 0.5) * 3;
+
+                createFood(p);
+            }
+        }
+
+        this.removeAll();
+        this.alive = false;
+        this.isBoosting = false;
+
+        if(!this.isPlayer){
+            this.respawnTimer = 180;
+        }
+    }
+}
+
+function createNPCs(){
+    const colors = [
+        0xff4444,0x4488ff,0xffff44,0xff44ff,0xff8844,
+        0x00ffff,0x88ff44,0xffffff,0xff0088,0x8844ff,
+        0x00ff88,0x9999ff,0xff9999,0x99ff99,0xffcc00,
+        0xcc00ff,0x00ccff,0xccff00,0xff0066,0x66ffcc,
+        0x6666ff,0xff6600,0x33ff33,0xff33cc,0xdddddd,
+        0x00aa88,0xaa44ff,0xffaa44,0x44ffaa,0xaa0000,
+        0x0066ff,0x99ccff,0xffccff,0xccffaa,0xffee66,
+        0x55ff99,0x9955ff,0xff5599,0x55ccff,0xcc5555,
+        0x99ff55,0x5555cc,0xff9955,0x55ffaa,0xbbbbbb
+    ];
+
+    for(let i = 0; i < NPC_COUNT; i++){
+        const npc = new Snake(npcNames[i], colors[i], false);
+        snakes.push(npc);
+    }
+}
+
+createNPCs();
+
+function chooseNPCAttack(){
+    const attackers = snakes.filter(s => !s.isPlayer && s.alive);
+
+    if(attackers.length === 0) return;
+
+    const attacker = attackers[Math.floor(Math.random() * attackers.length)];
+
+    const targets = snakes.filter(s =>
+        s !== attacker &&
+        s.alive &&
+        s.getSize() <= attacker.getSize() + 6
+    );
+
+    if(targets.length === 0) return;
+
+    let closest = null;
+    let closestDist = Infinity;
+
+    for(const t of targets){
+        const d = attacker.headPos.distanceTo(t.headPos);
+
+        if(d < closestDist){
+            closestDist = d;
+            closest = t;
+        }
+    }
+
+    if(closest){
+        attacker.attackTarget = closest;
+        attacker.attackTime = 20;
+        attacker.targetFood = null;
+    }
+}
+
+function createPlayer(){
+    const color = snakeColors[selectedColorIndex];
+
+    let nickname = document.getElementById("nickname").value.trim();
+
+    if(nickname === ""){
+        nickname = "Você";
+    }
+
+    player = new Snake(nickname, color, true);
+    player.score = START_SCORE;
+    player.growPoints = 0;
+    player.boostSpend = 0;
+
+    snakes.push(player);
+
+    playerAlive = true;
+    updateHud();
+}
+
+function startGame(){
+    document.getElementById("menu").style.display = "none";
+    gameStarted = true;
+
+    if(!player){
+        createPlayer();
+    }
+}
+
+function restartPlayer(){
+    document.getElementById("gameOver").style.display = "none";
+
+    if(player){
+        player.removeAll();
+        snakes = snakes.filter(s => s !== player);
+    }
+
+    createPlayer();
+}
+
+function killPlayer(){
+    if(!playerAlive) return;
+
+    playerAlive = false;
+    player.alive = false;
+
+    document.getElementById("finalScore").innerText = Math.floor(player.score);
+    document.getElementById("gameOver").style.display = "flex";
+}
+
+function checkCollisions(){
+    for(const attacker of snakes){
+        if(!attacker.alive) continue;
+
+        for(const target of snakes){
+            if(attacker === target) continue;
+            if(!target.alive) continue;
+
+            for(let i = 1; i < target.segments.length; i++){
+                const bodyPart = target.segments[i];
+                const dist = attacker.headPos.distanceTo(bodyPart.pos);
+
+                if(dist < 1.55){
+                    attacker.explode();
+                    target.addPoints(100);
+
+                    if(attacker.isPlayer){
+                        killPlayer();
+                    }
+
+                    if(target.isPlayer){
+                        updateHud();
+                    }
+
+                    return;
+                }
+            }
+        }
+    }
+}
+
+function updateNPCRespawn(){
+    for(const s of snakes){
+        if(!s.isPlayer && !s.alive){
+            s.respawnTimer--;
+
+            if(s.respawnTimer <= 0){
+                s.resetNPC();
+            }
+        }
+    }
+}
+
+function updateWorldEvents(delta){
+    groupFoodTimer += delta;
+    bigFoodTimer += delta;
+    npcAttackTimer += delta;
+
+    if(groupFoodTimer >= 300){
+        groupFoodTimer = 0;
+        spawnFoodGroup();
+    }
+
+    if(bigFoodTimer >= 120){
+        bigFoodTimer = 0;
+        spawnBigFood();
+    }
+
+    if(npcAttackTimer >= 60){
+        npcAttackTimer = 0;
+        chooseNPCAttack();
+    }
+}
+
+function updateBigFoodEffects(delta){
+    for(const food of foods){
+        if(food.big){
+            food.pulseTime += delta * 6;
+
+            const pulse = 0.65 + Math.sin(food.pulseTime) * 0.35;
+            food.material.emissiveIntensity = 0.8 + pulse * 1.8;
+
+            const scale = 1 + pulse * 0.25;
+            food.scale.set(scale, scale, scale);
+        }
+    }
+}
+
+function updateHud(){
+    if(!player) return;
+
+    document.getElementById("size").innerText = player.getSize();
+    document.getElementById("score").innerText = Math.floor(player.score);
+}
+
+function updateRanking(){
+    const aliveSnakes = snakes
+        .filter(s => s.alive)
+        .sort((a,b) => b.score - a.score)
+        .slice(0,10);
+
+    let html = "";
+
+    aliveSnakes.forEach((s,i) => {
+        const crown = i === 0 ? "👑 " : "";
+        html += `${i + 1}. ${crown}${s.name} - ${Math.floor(s.score)} pts<br>`;
+    });
+
+    document.getElementById("rankList").innerHTML = html;
+}
+
+const keys = {};
+
+window.addEventListener("keydown", e => {
+    keys[e.key.toLowerCase()] = true;
+});
+
+window.addEventListener("keyup", e => {
+    keys[e.key.toLowerCase()] = false;
+});
+
+function updateCamera(){
+    if(!player || !playerAlive) return;
+
+    const head = player.headPos;
+
+    camera.position.x += (head.x - camera.position.x) * 0.08;
+    camera.position.y += (20 - camera.position.y) * 0.08;
+    camera.position.z += ((head.z - 22) - camera.position.z) * 0.08;
+
+    camera.lookAt(head.x, 0, head.z);
+}
+
+function animate(){
+    requestAnimationFrame(animate);
+
+    const now = performance.now();
+    const delta = (now - lastTime) / 1000;
+    lastTime = now;
+
+    if(gameStarted){
+        snakes.forEach(s => {
+            if(!s.isPlayer || playerAlive){
+                s.update(delta);
+            }
+        });
+
+        checkCollisions();
+        updateNPCRespawn();
+        updateWorldEvents(delta);
+        updateBigFoodEffects(delta);
+        updateRanking();
+        updateCamera();
+    }
+
+    renderer.render(scene,camera);
+}
+
+camera.position.set(0,20,-22);
+camera.lookAt(0,0,0);
+
+animate();
+
+window.addEventListener("resize", () => {
+    camera.aspect = innerWidth / innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+
+</body>
+</html>
