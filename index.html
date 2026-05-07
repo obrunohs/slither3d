@@ -1877,43 +1877,68 @@ function updateCamera(){
 
     const head = player.headPos;
 
-    let dir = new THREE.Vector3(0, 0, 1);
+    let dirX = 0;
+    let dirZ = 1;
 
-    if(player.segments && player.segments.length > 1){
+    if(player.segments.length > 1){
 
         const neck = player.segments[1].pos;
 
-        dir = new THREE.Vector3(
-            head.x - neck.x,
-            0,
-            head.z - neck.z
-        );
+        dirX = head.x - neck.x;
+        dirZ = head.z - neck.z;
 
-        if(dir.length() > 0.01){
-            dir.normalize();
+        const len = Math.hypot(dirX, dirZ);
+
+        if(len > 0.001){
+            dirX /= len;
+            dirZ /= len;
         }
     }
 
-    const distance = 24;
-    const height = 20;
+    const camDistance = 28;
+    const camHeight = 20;
 
-    const targetCameraPos = new THREE.Vector3(
-        head.x - dir.x * distance,
-        height,
-        head.z - dir.z * distance
+    const targetX =
+        head.x - dirX * camDistance;
+
+    const targetZ =
+        head.z - dirZ * camDistance;
+
+    const targetY = camHeight;
+
+    camera.position.x +=
+        (targetX - camera.position.x) * 0.035;
+
+    camera.position.y +=
+        (targetY - camera.position.y) * 0.035;
+
+    camera.position.z +=
+        (targetZ - camera.position.z) * 0.035;
+
+    const currentLook =
+    new THREE.Vector3();
+
+    camera.getWorldDirection(currentLook);
+
+    const targetLook = new THREE.Vector3(
+        dirX,
+        -0.25,
+        dirZ
     );
 
-    camera.position.lerp(targetCameraPos, 0.08);
-
-    const lookTarget = new THREE.Vector3(
-        head.x + dir.x * 12,
-        0,
-        head.z + dir.z * 12
+    currentLook.lerp(
+        targetLook,
+        0.04
     );
 
-    camera.lookAt(lookTarget);
+    const lookPos = new THREE.Vector3(
+        camera.position.x + currentLook.x * 20,
+        head.y,
+        camera.position.z + currentLook.z * 20
+    );
+
+    camera.lookAt(lookPos);
 }
-
 function animate(){
 
     requestAnimationFrame(animate);
