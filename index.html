@@ -1895,17 +1895,14 @@ function updateCamera(){
         }
     }
 
-    const distance = 16;
-    const height = 7;
-
     const targetX =
-        head.x - dirX * distance;
+        head.x - dirX * 10;
 
     const targetY =
-        height;
+        20;
 
     const targetZ =
-        head.z - dirZ * distance;
+        head.z - dirZ * 22;
 
     camera.position.x +=
         (targetX - camera.position.x) * 0.05;
@@ -1916,13 +1913,14 @@ function updateCamera(){
     camera.position.z +=
         (targetZ - camera.position.z) * 0.05;
 
-    const lookAhead = 8;
-
-    camera.lookAt(
-        head.x + dirX * lookAhead,
-        1.5,
-        head.z + dirZ * lookAhead
+    const lookTarget =
+    new THREE.Vector3(
+        head.x + dirX * 6,
+        0,
+        head.z + dirZ * 6
     );
+
+    camera.lookAt(lookTarget);
 }
     
 function animate(){
