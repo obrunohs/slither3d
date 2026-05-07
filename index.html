@@ -24,6 +24,39 @@ body{
     z-index:20;
 }
 
+#menuContent{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:40px;
+}
+
+#menuMain{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+}
+
+#menuGlobalRank{
+    width:270px;
+    min-height:300px;
+    background:rgba(255,255,255,0.08);
+    border:1px solid rgba(255,255,255,0.18);
+    border-radius:18px;
+    padding:15px;
+    color:white;
+}
+
+#menuGlobalRank h3{
+    margin-top:0;
+    text-align:center;
+}
+
+#globalRankList{
+    line-height:1.8;
+    font-size:16px;
+}
+
 #gameOver{
     display:none;
 }
@@ -90,6 +123,10 @@ button{
     z-index:10;
     width:250px;
 }
+
+#rankList{
+    line-height:1.7;
+}
 </style>
 </head>
 
@@ -97,29 +134,47 @@ button{
 
 <div id="menu">
 
-    <h1>Snake 3D IO</h1>
+    <div id="menuContent">
 
-    <input id="nickname"
-    placeholder="Digite seu nickname"
-    maxlength="14">
+        <div id="menuMain">
 
-    <div id="colorPicker">
+            <h1>Snake 3D IO</h1>
 
-        <button class="arrowBtn"
-        onclick="prevColor()">‹</button>
+            <input id="nickname"
+            placeholder="Digite seu nickname"
+            maxlength="14">
 
-        <canvas id="preview"
-        width="360"
-        height="120"></canvas>
+            <div id="colorPicker">
 
-        <button class="arrowBtn"
-        onclick="nextColor()">›</button>
+                <button class="arrowBtn"
+                onclick="prevColor()">‹</button>
+
+                <canvas id="preview"
+                width="360"
+                height="120"></canvas>
+
+                <button class="arrowBtn"
+                onclick="nextColor()">›</button>
+
+            </div>
+
+            <button onclick="startGame()">
+                Iniciar
+            </button>
+
+        </div>
+
+        <div id="menuGlobalRank">
+
+            <h3>Ranking Global</h3>
+
+            <div id="globalRankList">
+                Carregando...
+            </div>
+
+        </div>
 
     </div>
-
-    <button onclick="startGame()">
-        Iniciar
-    </button>
 
 </div>
 
@@ -297,6 +352,14 @@ let playerAlive = false;
 
 let lastTime = performance.now();
 
+let playerId =
+"player_" +
+Date.now() +
+"_" +
+Math.floor(Math.random() * 999999);
+
+let lastOnlineUpdate = 0;
+
 const snakeColors = [
 
 0x00ff88,
@@ -336,6 +399,7 @@ function nextColor(){
     }
 
 }
+
 const previewCanvas =
 document.getElementById("preview");
 
@@ -405,6 +469,77 @@ function drawPreview(){
 }
 
 drawPreview();
+
+function createNameLabel(text){
+
+    const canvas =
+    document.createElement("canvas");
+
+    canvas.width = 256;
+    canvas.height = 64;
+
+    const ctx =
+    canvas.getContext("2d");
+
+    ctx.clearRect(
+        0,
+        0,
+        canvas.width,
+        canvas.height
+    );
+
+    ctx.font =
+    "bold 30px Arial";
+
+    ctx.textAlign =
+    "center";
+
+    ctx.textBaseline =
+    "middle";
+
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = "black";
+
+    ctx.strokeText(
+        text,
+        canvas.width / 2,
+        canvas.height / 2
+    );
+
+    ctx.fillStyle = "white";
+
+    ctx.fillText(
+        text,
+        canvas.width / 2,
+        canvas.height / 2
+    );
+
+    const texture =
+    new THREE.CanvasTexture(canvas);
+
+    const material =
+    new THREE.SpriteMaterial({
+        map:texture,
+        transparent:true,
+        depthWrite:false
+    });
+
+    const sprite =
+    new THREE.Sprite(material);
+
+    sprite.scale.set(
+        10,
+        2.5,
+        1
+    );
+
+    sprite.userData.canvas = canvas;
+    sprite.userData.ctx = ctx;
+    sprite.userData.texture = texture;
+
+    return sprite;
+
+}
 
 function randomPos(){
 
@@ -496,8 +631,7 @@ for(let i = 0; i < 900; i++){
     createFood();
 
 }
-
-class Snake{
+    class Snake{
 
     constructor(
         name,
@@ -533,11 +667,44 @@ class Snake{
 
         this.headPos = randomPos();
 
+        this.nameLabel =
+        createNameLabel(this.name);
+
+        scene.add(this.nameLabel);
+
         for(let i = 0; i < START_SEGMENTS; i++){
 
             this.addSegment(true);
 
         }
+
+        this.updateNameLabel();
+
+    }
+
+    updateNameLabel(){
+
+        if(!this.nameLabel){
+            return;
+        }
+
+        if(
+            !this.alive ||
+            this.segments.length === 0
+        ){
+
+            this.nameLabel.visible = false;
+            return;
+
+        }
+
+        this.nameLabel.visible = true;
+
+        this.nameLabel.position.set(
+            this.headPos.x,
+            4.5,
+            this.headPos.z
+        );
 
     }
 
@@ -627,6 +794,38 @@ class Snake{
         this.segments = [];
         this.path = [];
 
+        if(this.nameLabel){
+
+            this.nameLabel.visible = false;
+
+        }
+
+    }
+
+    destroy(){
+
+        this.removeAll();
+
+        if(this.nameLabel){
+
+            scene.remove(this.nameLabel);
+
+            if(this.nameLabel.material){
+
+                this.nameLabel.material.dispose();
+
+            }
+
+            if(this.nameLabel.material.map){
+
+                this.nameLabel.material.map.dispose();
+
+            }
+
+            this.nameLabel = null;
+
+        }
+
     }
 
     resetNPC(){
@@ -654,6 +853,8 @@ class Snake{
             this.addSegment(true);
 
         }
+
+        this.updateNameLabel();
 
     }
 
@@ -821,6 +1022,8 @@ class Snake{
 
         }
 
+        this.updateNameLabel();
+
         this.eatFood();
 
     }
@@ -859,8 +1062,9 @@ class Snake{
 
         }
 
-    } 
-        updateAI(delta){
+    }
+
+    updateAI(delta){
 
         let target = null;
 
@@ -1109,6 +1313,10 @@ class Snake{
 
                     updateHud();
 
+                    updateOnlineRankingNow();
+
+                    saveGlobalRanking();
+
                 }
 
                 if(!this.isPlayer){
@@ -1159,8 +1367,7 @@ class Snake{
     }
 
 }
-
-function createNPCs(){
+    function createNPCs(){
 
     const colors = [
 
@@ -1248,6 +1455,10 @@ function createPlayer(){
 
     updateHud();
 
+    updateOnlineRankingNow();
+
+    setupDisconnectRemove();
+
 }
 
 function startGame(){
@@ -1274,7 +1485,9 @@ function restartPlayer(){
 
     if(player){
 
-        player.removeAll();
+        removePlayerOnlineRanking();
+
+        player.destroy();
 
         snakes =
         snakes.filter(
@@ -1285,8 +1498,9 @@ function restartPlayer(){
 
     createPlayer();
 
-} 
-    function killPlayer(){
+}
+
+function killPlayer(){
 
     if(!playerAlive){
         return;
@@ -1295,6 +1509,10 @@ function restartPlayer(){
     playerAlive = false;
 
     player.alive = false;
+
+    saveGlobalRanking();
+
+    removePlayerOnlineRanking();
 
     document.getElementById(
         "finalScore"
@@ -1354,6 +1572,10 @@ function checkCollisions(){
                     if(target.isPlayer){
 
                         updateHud();
+
+                        updateOnlineRankingNow();
+
+                        saveGlobalRanking();
 
                     }
 
@@ -1442,34 +1664,97 @@ function updateHud(){
 
 }
 
-function updateRanking(){
+function updateOnlineRankingNow(){
 
     if(
-        player &&
-        playerAlive
+        !player ||
+        !playerAlive
     ){
-
-        firebaseSet(
-
-            firebaseRef(
-                window.firebaseDB,
-                "ranking/" + player.name
-            ),
-
-            {
-                name: player.name,
-                score: Math.floor(player.score)
-            }
-
-        );
-
+        return;
     }
+
+    firebaseSet(
+
+        firebaseRef(
+            window.firebaseDB,
+            "playersOnline/" + playerId
+        ),
+
+        {
+            id: playerId,
+            name: player.name,
+            score: Math.floor(player.score)
+        }
+
+    );
+
+}
+
+function removePlayerOnlineRanking(){
+
+    if(!window.firebaseRemove){
+        return;
+    }
+
+    firebaseRemove(
+
+        firebaseRef(
+            window.firebaseDB,
+            "playersOnline/" + playerId
+        )
+
+    );
+
+}
+
+function saveGlobalRanking(){
+
+    if(!player){
+        return;
+    }
+
+    firebaseSet(
+
+        firebaseRef(
+            window.firebaseDB,
+            "globalRanking/" + player.name
+        ),
+
+        {
+            name: player.name,
+            score: Math.floor(player.score)
+        }
+
+    );
+
+}
+
+function setupDisconnectRemove(){
+
+    if(
+        !window.firebaseOnDisconnect
+    ){
+        return;
+    }
+
+    firebaseOnDisconnect(
+
+        firebaseRef(
+            window.firebaseDB,
+            "playersOnline/" + playerId
+        )
+
+    ).remove();
+
+}
+
+function listenOnlineRanking(){
 
     firebaseOnValue(
 
         firebaseRef(
             window.firebaseDB,
-            "ranking"
+            "playersOnline"
         ),
 
         (snapshot) => {
@@ -1478,7 +1763,14 @@ function updateRanking(){
             snapshot.val();
 
             if(!data){
+
+                document.getElementById(
+                    "rankList"
+                ).innerHTML =
+                "Vazio";
+
                 return;
+
             }
 
             const players =
@@ -1502,7 +1794,7 @@ function updateRanking(){
                 : "";
 
                 html +=
-                `${i + 1}. ${crown}${p.name} - ${p.score} pts<br>`;
+                `${i + 1}. ${crown}${p.name} - ${p.score}<br>`;
 
             });
 
@@ -1515,6 +1807,70 @@ function updateRanking(){
     );
 
 }
+
+function listenGlobalRanking(){
+
+    firebaseOnValue(
+
+        firebaseRef(
+            window.firebaseDB,
+            "globalRanking"
+        ),
+
+        (snapshot) => {
+
+            const data =
+            snapshot.val();
+
+            if(!data){
+
+                document.getElementById(
+                    "globalRankList"
+                ).innerHTML =
+                "Sem recordes";
+
+                return;
+
+            }
+
+            const players =
+            Object.values(data);
+
+            players.sort(
+                (a,b) =>
+                b.score - a.score
+            );
+
+            const top10 =
+            players.slice(0,10);
+
+            let html = "";
+
+            top10.forEach((p,i) => {
+
+                const crown =
+                i === 0
+                ? "👑 "
+                : "";
+
+                html +=
+                `${i + 1}. ${crown}${p.name} - ${p.score}<br>`;
+
+            });
+
+            document.getElementById(
+                "globalRankList"
+            ).innerHTML = html;
+
+        }
+
+    );
+
+}
+
+listenOnlineRanking();
+
+listenGlobalRanking();
 
 const keys = {};
 
@@ -1577,8 +1933,7 @@ function updateCamera(){
     );
 
 }
-
-function animate(){
+    function animate(){
 
     requestAnimationFrame(
         animate
@@ -1613,7 +1968,19 @@ function animate(){
 
         updateBigFoodEffects(delta);
 
-        updateRanking();
+        if(
+            player &&
+            playerAlive &&
+            now - lastOnlineUpdate > 700
+        ){
+
+            updateOnlineRankingNow();
+
+            saveGlobalRanking();
+
+            lastOnlineUpdate = now;
+
+        }
 
         updateCamera();
 
@@ -1656,6 +2023,14 @@ window.addEventListener(
 
 });
 
+window.addEventListener(
+"beforeunload",
+() => {
+
+    removePlayerOnlineRanking();
+
+});
+
 </script>
 
 <script type="module">
@@ -1670,7 +2045,9 @@ import {
 getDatabase,
 ref,
 set,
-onValue
+onValue,
+remove,
+onDisconnect
 }
 from
 "https://www.gstatic.com/firebasejs/12.12.1/firebase-database.js";
@@ -1682,6 +2059,9 @@ apiKey:
 
 authDomain:
 "slither3d-54683.firebaseapp.com",
+
+databaseURL:
+"https://slither3d-54683-default-rtdb.firebaseio.com",
 
 projectId:
 "slither3d-54683",
@@ -1707,6 +2087,8 @@ window.firebaseDB = db;
 window.firebaseRef = ref;
 window.firebaseSet = set;
 window.firebaseOnValue = onValue;
+window.firebaseRemove = remove;
+window.firebaseOnDisconnect = onDisconnect;
 
 </script>
 
