@@ -1895,39 +1895,31 @@ function updateCamera(){
         }
     }
 
-    const camDistance = 22;
-    const camHeight = 14;
-
     const targetX =
-        head.x - dirX * camDistance;
-
-    const targetZ =
-        head.z - dirZ * camDistance;
+        head.x - dirX * 18;
 
     const targetY =
-        camHeight;
+        11;
+
+    const targetZ =
+        head.z - dirZ * 18;
 
     camera.position.x +=
-        (targetX - camera.position.x) * 0.03;
+        (targetX - camera.position.x) * 0.04;
 
     camera.position.y +=
-        (targetY - camera.position.y) * 0.03;
+        (targetY - camera.position.y) * 0.04;
 
     camera.position.z +=
-        (targetZ - camera.position.z) * 0.03;
-
-    const lookX =
-        head.x + dirX * 8;
-
-    const lookZ =
-        head.z + dirZ * 8;
+        (targetZ - camera.position.z) * 0.04;
 
     camera.lookAt(
-        lookX,
+        head.x,
         2,
-        lookZ
+        head.z
     );
 }
+    
 function animate(){
 
     requestAnimationFrame(animate);
@@ -1979,13 +1971,13 @@ function animate(){
 
 camera.position.set(
 0,
-20,
--22
+11,
+-18
 );
 
 camera.lookAt(
 0,
-0,
+2,
 0
 );
 
