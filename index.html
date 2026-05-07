@@ -153,7 +153,6 @@ const START_SEGMENTS = 5;
 const START_SCORE = START_SEGMENTS * POINTS_TO_GROW;
 const BOOST_COST_PER_SECOND = 15;
 const MIN_SEGMENTS_TO_BOOST = 3;
-const NPC_COUNT = 45;
 
 const floor = new THREE.Mesh(
     new THREE.BoxGeometry(MAP_SIZE,1,MAP_SIZE),
@@ -184,15 +183,6 @@ let playerAlive = false;
 let lastTime = performance.now();
 let groupFoodTimer = 0;
 let bigFoodTimer = 0;
-let npcAttackTimer = 0;
-
-const npcNames = [
-    "Shadow","Hunter","Blaze","Storm","Venom","Rex","Ghost","Turbo","Rocket",
-    "Frost","Viper","Dash","Pixel","Raven","Wolf","Falcon","Ace","Nitro",
-    "Phantom","Crusher","Spike","Bolt","Comet","Legend","SnakeBoss","Cyber",
-    "Titan","Alpha","Omega","Flash","Blade","Nova","Rapid","Inferno","Drift",
-    "Skull","Cobra","Max","Zero","Lucky","Eagle","Chaos","Knight","Dragon","Toxic"
-];
 
 const snakeColors = [
     0x00ff88,
@@ -248,39 +238,6 @@ function drawPreview(){
 
 drawPreview();
 
-function createNameSprite(text){
-    const canvas = document.createElement("canvas");
-    canvas.width = 256;
-    canvas.height = 64;
-
-    const ctx = canvas.getContext("2d");
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-
-    ctx.font = "bold 28px Arial";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-
-    ctx.fillStyle = "rgba(255,255,255,0.72)";
-    ctx.strokeStyle = "rgba(0,0,0,0.55)";
-    ctx.lineWidth = 4;
-
-    ctx.strokeText(text,128,32);
-    ctx.fillText(text,128,32);
-
-    const texture = new THREE.CanvasTexture(canvas);
-    const material = new THREE.SpriteMaterial({
-        map:texture,
-        transparent:true,
-        depthWrite:false
-    });
-
-    const sprite = new THREE.Sprite(material);
-    sprite.scale.set(8,2,1);
-
-    scene.add(sprite);
-    return sprite;
-}
-
 function randomPos(){
     return new THREE.Vector3(
         (Math.random() - 0.5) * (MAP_SIZE - 60),
@@ -305,6 +262,7 @@ function createFood(pos = null, value = POINTS_PER_FOOD, big = false){
     food.position.y = big ? 0.9 : 0.35;
     food.value = value;
     food.big = big;
+    food.baseScale = big ? 1 : 1;
     food.pulseTime = Math.random() * 10;
 
     scene.add(food);
@@ -312,14 +270,18 @@ function createFood(pos = null, value = POINTS_PER_FOOD, big = false){
 }
 
 function spawnFoodGroup(){
-    for(let i = 0; i < 50; i++) createFood();
+    for(let i = 0; i < 50; i++){
+        createFood();
+    }
 }
 
 function spawnBigFood(){
     createFood(randomPos(), BIG_FOOD_POINTS, true);
 }
 
-for(let i = 0; i < 900; i++) createFood();
+for(let i = 0; i < 900; i++){
+    createFood();
+}
 
 class Snake{
     constructor(name, color, isPlayer = false){
@@ -343,16 +305,9 @@ class Snake{
 
         this.targetFood = null;
         this.changeTargetTimer = 0;
-
-        this.boostCooldown = 3 + Math.random() * 8;
-        this.boostDuration = 0;
-
-        this.attackTarget = null;
-        this.attackTime = 0;
+        this.boostTimer = Math.random() * 4;
 
         this.headPos = randomPos();
-
-        this.nameSprite = createNameSprite(this.name);
 
         for(let i = 0; i < START_SEGMENTS; i++){
             this.addSegment(true);
@@ -403,10 +358,6 @@ class Snake{
         this.segments.forEach(s => scene.remove(s.mesh));
         this.segments = [];
         this.path = [];
-
-        if(this.nameSprite){
-            scene.remove(this.nameSprite);
-        }
     }
 
     resetNPC(){
@@ -422,12 +373,6 @@ class Snake{
         this.targetFood = null;
         this.path = [];
         this.isBoosting = false;
-        this.attackTarget = null;
-        this.attackTime = 0;
-        this.boostCooldown = 3 + Math.random() * 8;
-        this.boostDuration = 0;
-
-        this.nameSprite = createNameSprite(this.name);
 
         for(let i = 0; i < START_SEGMENTS; i++){
             this.addSegment(true);
@@ -460,11 +405,16 @@ class Snake{
 
             if(this.getSize() > 2){
                 this.score -= POINTS_TO_GROW;
-                if(this.score < 0) this.score = 0;
+
+                if(this.score < 0){
+                    this.score = 0;
+                }
 
                 this.removeLastSegment();
 
-                if(this.isPlayer) updateHud();
+                if(this.isPlayer){
+                    updateHud();
+                }
             }
         }
     }
@@ -475,18 +425,6 @@ class Snake{
         for(const seg of this.segments){
             seg.mesh.material.emissiveIntensity = intensity;
         }
-    }
-
-    updateNameSprite(){
-        if(!this.nameSprite || !this.alive) return;
-
-        this.nameSprite.position.set(
-            this.headPos.x,
-            4.2,
-            this.headPos.z
-        );
-
-        this.nameSprite.lookAt(camera.position);
     }
 
     update(delta){
@@ -532,7 +470,6 @@ class Snake{
             this.segments[i].mesh.position.y = 1;
         }
 
-        this.updateNameSprite();
         this.eatFood();
     }
 
@@ -540,7 +477,9 @@ class Snake{
         if(keys["a"]) this.angle += 0.045;
         if(keys["d"]) this.angle -= 0.045;
 
-        if(keys["w"] && this.canBoost()){
+        const wantsBoost = keys["w"];
+
+        if(wantsBoost && this.canBoost()){
             this.speed = 0.34;
             this.isBoosting = true;
             this.spendBoost(delta);
@@ -556,18 +495,7 @@ class Snake{
         let flee = false;
         let chasePlayer = false;
 
-        if(this.attackTarget && (!this.attackTarget.alive || this.attackTime <= 0)){
-            this.attackTarget = null;
-            this.attackTime = 0;
-        }
-
-        if(this.attackTarget){
-            target = this.attackTarget.headPos.clone();
-            chasePlayer = true;
-            this.attackTime -= delta;
-        }
-
-        if(!target && player && playerAlive){
+        if(player && playerAlive){
             const distPlayer = this.headPos.distanceTo(player.headPos);
 
             if(distPlayer < 55){
@@ -604,35 +532,27 @@ class Snake{
             }
 
             const desiredAngle = Math.atan2(dx, dz);
+
             let diff = desiredAngle - this.angle;
             diff = Math.atan2(Math.sin(diff), Math.cos(diff));
 
             this.angle += diff * 0.10;
         }
 
-        this.manageNPCBoost(delta, flee, chasePlayer);
-    }
-
-    manageNPCBoost(delta, flee, chasePlayer){
-        this.boostCooldown -= delta;
+        this.boostTimer -= delta;
 
         let wantsBoost = false;
 
-        if(this.boostDuration > 0){
-            this.boostDuration -= delta;
-            wantsBoost = true;
-        }else if(this.boostCooldown <= 0 && this.canBoost()){
-            if(flee || chasePlayer || this.attackTarget){
-                this.boostDuration = 1.2 + Math.random() * 1.2;
-                this.boostCooldown = 8 + Math.random() * 14;
-                wantsBoost = true;
-            }else if(Math.random() < 0.18){
-                this.boostDuration = 0.6 + Math.random() * 0.8;
-                this.boostCooldown = 12 + Math.random() * 18;
-                wantsBoost = true;
-            }else{
-                this.boostCooldown = 5 + Math.random() * 8;
+        if(this.boostTimer <= 0){
+            this.boostTimer = 2 + Math.random() * 4;
+
+            if(this.canBoost()){
+                wantsBoost = Math.random() < 0.45;
             }
+        }
+
+        if((flee || chasePlayer) && this.canBoost()){
+            wantsBoost = true;
         }
 
         if(wantsBoost && this.canBoost()){
@@ -739,54 +659,16 @@ function createNPCs(){
         0x00ffff,0x88ff44,0xffffff,0xff0088,0x8844ff,
         0x00ff88,0x9999ff,0xff9999,0x99ff99,0xffcc00,
         0xcc00ff,0x00ccff,0xccff00,0xff0066,0x66ffcc,
-        0x6666ff,0xff6600,0x33ff33,0xff33cc,0xdddddd,
-        0x00aa88,0xaa44ff,0xffaa44,0x44ffaa,0xaa0000,
-        0x0066ff,0x99ccff,0xffccff,0xccffaa,0xffee66,
-        0x55ff99,0x9955ff,0xff5599,0x55ccff,0xcc5555,
-        0x99ff55,0x5555cc,0xff9955,0x55ffaa,0xbbbbbb
+        0x6666ff,0xff6600,0x33ff33,0xff33cc,0xdddddd
     ];
 
-    for(let i = 0; i < NPC_COUNT; i++){
-        const npc = new Snake(npcNames[i], colors[i], false);
+    for(let i = 0; i < 25; i++){
+        const npc = new Snake("NPC " + (i + 1), colors[i], false);
         snakes.push(npc);
     }
 }
 
 createNPCs();
-
-function chooseNPCAttack(){
-    const attackers = snakes.filter(s => !s.isPlayer && s.alive);
-
-    if(attackers.length === 0) return;
-
-    const attacker = attackers[Math.floor(Math.random() * attackers.length)];
-
-    const targets = snakes.filter(s =>
-        s !== attacker &&
-        s.alive &&
-        s.getSize() <= attacker.getSize() + 6
-    );
-
-    if(targets.length === 0) return;
-
-    let closest = null;
-    let closestDist = Infinity;
-
-    for(const t of targets){
-        const d = attacker.headPos.distanceTo(t.headPos);
-
-        if(d < closestDist){
-            closestDist = d;
-            closest = t;
-        }
-    }
-
-    if(closest){
-        attacker.attackTarget = closest;
-        attacker.attackTime = 20;
-        attacker.targetFood = null;
-    }
-}
 
 function createPlayer(){
     const color = snakeColors[selectedColorIndex];
@@ -884,7 +766,6 @@ function updateNPCRespawn(){
 function updateWorldEvents(delta){
     groupFoodTimer += delta;
     bigFoodTimer += delta;
-    npcAttackTimer += delta;
 
     if(groupFoodTimer >= 300){
         groupFoodTimer = 0;
@@ -894,11 +775,6 @@ function updateWorldEvents(delta){
     if(bigFoodTimer >= 120){
         bigFoodTimer = 0;
         spawnBigFood();
-    }
-
-    if(npcAttackTimer >= 60){
-        npcAttackTimer = 0;
-        chooseNPCAttack();
     }
 }
 
@@ -997,6 +873,24 @@ window.addEventListener("resize", () => {
     renderer.setSize(innerWidth, innerHeight);
 });
 </script>
+<script type="module">
+  // Import the functions you need from the SDKs you need
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-app.js";
+  // TODO: Add SDKs for Firebase products that you want to use
+  // https://firebase.google.com/docs/web/setup#available-libraries
 
+  // Your web app's Firebase configuration
+  const firebaseConfig = {
+    apiKey: "AIzaSyDyM6_nMlHtle4Z030VmLS7_ZPm4Cw4ww8",
+    authDomain: "slither3d-54683.firebaseapp.com",
+    projectId: "slither3d-54683",
+    storageBucket: "slither3d-54683.firebasestorage.app",
+    messagingSenderId: "747917317954",
+    appId: "1:747917317954:web:5516fc0d798a3b5c5f5adb"
+  };
+
+  // Initialize Firebase
+  const app = initializeApp(firebaseConfig);
+</script>
 </body>
 </html>
