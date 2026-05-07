@@ -1440,7 +1440,7 @@ function createPlayer(){
 
     updateHud();
     updateOnlineRankingNow();
-    setupDisconnectRemove();
+setupDisconnectRemove();
 }
 
 function startGame(){
@@ -1572,6 +1572,18 @@ function updateHud(){
     document.getElementById("score").innerText = Math.floor(player.score);
 }
 
+function getPlayerKey(){
+
+    if(!player || !player.name){
+        return playerId;
+    }
+
+    return player.name
+        .trim()
+        .toLowerCase()
+        .replace(/[.#$/[\]]/g, "_");
+}
+
 function updateOnlineRankingNow(){
 
     if(!player || !playerAlive){
@@ -1582,13 +1594,15 @@ function updateOnlineRankingNow(){
         return;
     }
 
+    const playerKey = getPlayerKey();
+
     window.firebaseSet(
         window.firebaseRef(
             window.firebaseDB,
-            "playersOnline/" + playerId
+            "playersOnline/" + playerKey
         ),
         {
-            id: playerId,
+            id: playerKey,
             name: player.name,
             score: Math.floor(player.score)
         }
@@ -1597,14 +1611,16 @@ function updateOnlineRankingNow(){
 
 function removePlayerOnlineRanking(){
 
-    if(!window.firebaseRemove || !window.firebaseRef || !window.firebaseDB){
+    if(!window.firebaseRemove || !window.firebaseRef || !window.firebaseDB || !player){
         return;
     }
+
+    const playerKey = getPlayerKey();
 
     window.firebaseRemove(
         window.firebaseRef(
             window.firebaseDB,
-            "playersOnline/" + playerId
+            "playersOnline/" + playerKey
         )
     );
 }
@@ -1615,20 +1631,38 @@ function saveGlobalRanking(){
         return;
     }
 
-    if(!window.firebaseSet || !window.firebaseRef || !window.firebaseDB){
+    if(
+        !window.firebaseGet ||
+        !window.firebaseSet ||
+        !window.firebaseRef ||
+        !window.firebaseDB
+    ){
         return;
     }
 
-    window.firebaseSet(
-        window.firebaseRef(
-            window.firebaseDB,
-            "globalRanking/" + player.name
-        ),
-        {
-            name: player.name,
-            score: Math.floor(player.score)
-        }
+    const playerKey = getPlayerKey();
+    const scoreAtual = Math.floor(player.score);
+
+    const recordRef = window.firebaseRef(
+        window.firebaseDB,
+        "globalRanking/" + playerKey
     );
+
+    window.firebaseGet(recordRef).then((snapshot) => {
+
+        const antigo = snapshot.val();
+
+        if(!antigo || scoreAtual > (antigo.score || 0)){
+
+            window.firebaseSet(
+                recordRef,
+                {
+                    name: player.name,
+                    score: scoreAtual
+                }
+            );
+        }
+    });
 }
 
 function setupDisconnectRemove(){
@@ -1636,15 +1670,18 @@ function setupDisconnectRemove(){
     if(
         !window.firebaseOnDisconnect ||
         !window.firebaseRef ||
-        !window.firebaseDB
+        !window.firebaseDB ||
+        !player
     ){
         return;
     }
 
+    const playerKey = getPlayerKey();
+
     window.firebaseOnDisconnect(
         window.firebaseRef(
             window.firebaseDB,
-            "playersOnline/" + playerId
+            "playersOnline/" + playerKey
         )
     ).remove();
 }
