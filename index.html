@@ -1907,20 +1907,21 @@ function updateCamera(){
     const targetY = camHeight;
 
     camera.position.x +=
-        (targetX - camera.position.x) * 0.035;
+        (targetX - camera.position.x) * 0.02;
 
     camera.position.y +=
-        (targetY - camera.position.y) * 0.035;
+        (targetY - camera.position.y) * 0.02;
 
     camera.position.z +=
-        (targetZ - camera.position.z) * 0.035;
+        (targetZ - camera.position.z) * 0.02;
 
     const currentLook =
     new THREE.Vector3();
 
     camera.getWorldDirection(currentLook);
 
-    const targetLook = new THREE.Vector3(
+    const targetLook =
+    new THREE.Vector3(
         dirX,
         -0.25,
         dirZ
@@ -1928,10 +1929,11 @@ function updateCamera(){
 
     currentLook.lerp(
         targetLook,
-        0.04
+        0.01
     );
 
-    const lookPos = new THREE.Vector3(
+    const lookPos =
+    new THREE.Vector3(
         camera.position.x + currentLook.x * 20,
         head.y,
         camera.position.z + currentLook.z * 20
@@ -1939,8 +1941,8 @@ function updateCamera(){
 
     camera.lookAt(lookPos);
 }
-function animate(){
 
+function animate(){
     requestAnimationFrame(animate);
 
     const now = performance.now();
