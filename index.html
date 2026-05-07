@@ -25,19 +25,26 @@ body{
 }
 
 #menuContent{
+    position:relative;
+    width:100%;
+    height:100%;
     display:flex;
     align-items:center;
     justify-content:center;
-    gap:40px;
 }
 
 #menuMain{
     display:flex;
     flex-direction:column;
     align-items:center;
+    transform:translateX(-40px);
 }
 
 #menuGlobalRank{
+    position:absolute;
+    right:45px;
+    top:50%;
+    transform:translateY(-50%);
     width:270px;
     min-height:300px;
     background:rgba(255,255,255,0.08);
@@ -127,6 +134,13 @@ button{
 #rankList{
     line-height:1.7;
 }
+
+.gameOverButtons{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    justify-content:center;
+}
 </style>
 </head>
 
@@ -187,9 +201,17 @@ button{
         <span id="finalScore">0</span>
     </p>
 
-    <button onclick="restartPlayer()">
-        Jogar novamente
-    </button>
+    <div class="gameOverButtons">
+
+        <button onclick="restartPlayer()">
+            Jogar novamente
+        </button>
+
+        <button onclick="backToMenu()">
+            Menu
+        </button>
+
+    </div>
 
 </div>
 
@@ -236,7 +258,6 @@ innerWidth / innerHeight,
 0.1,
 3000
 );
-
 const renderer =
 new THREE.WebGLRenderer({
     antialias:true
@@ -1446,6 +1467,7 @@ setupDisconnectRemove();
 function startGame(){
 
     document.getElementById("menu").style.display = "none";
+    document.getElementById("gameOver").style.display = "none";
 
     gameStarted = true;
 
@@ -1459,12 +1481,41 @@ function restartPlayer(){
     document.getElementById("gameOver").style.display = "none";
 
     if(player){
+
         removePlayerOnlineRanking();
+
         player.destroy();
-        snakes = snakes.filter(s => s !== player);
+
+        snakes = snakes.filter(
+            s => s !== player
+        );
     }
 
     createPlayer();
+}
+
+function backToMenu(){
+
+    document.getElementById("gameOver").style.display = "none";
+
+    document.getElementById("menu").style.display = "flex";
+
+    gameStarted = false;
+
+    if(player){
+
+        removePlayerOnlineRanking();
+
+        player.destroy();
+
+        snakes = snakes.filter(
+            s => s !== player
+        );
+
+        player = null;
+    }
+
+    playerAlive = false;
 }
 
 function killPlayer(){
@@ -1474,15 +1525,22 @@ function killPlayer(){
     }
 
     playerAlive = false;
+
     player.alive = false;
 
     saveGlobalRanking();
+
     removePlayerOnlineRanking();
 
-    document.getElementById("finalScore").innerText = Math.floor(player.score);
-    document.getElementById("gameOver").style.display = "flex";
-}
+    document.getElementById(
+        "finalScore"
+    ).innerText =
+    Math.floor(player.score);
 
+    document.getElementById(
+        "gameOver"
+    ).style.display = "flex";
+}
 function checkCollisions(){
 
     for(const attacker of snakes){
