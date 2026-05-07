@@ -1944,15 +1944,64 @@ function animate(){
             lastOnlineUpdate = now;
         }
 
-        updateCamera();
+       function updateCamera(){
+
+    if(!player || !playerAlive){
+        return;
     }
 
-    renderer.render(scene, camera);
+    const head = player.headPos;
+
+    let dirX = 0;
+    let dirZ = 1;
+
+    if(player.segments.length > 1){
+
+        const neck = player.segments[1].pos;
+
+        dirX = head.x - neck.x;
+        dirZ = head.z - neck.z;
+
+        const len = Math.hypot(dirX, dirZ);
+
+        if(len > 0.001){
+            dirX /= len;
+            dirZ /= len;
+        }
+    }
+
+    const camDistance = 26;
+    const camHeight = 18;
+
+    const targetX =
+        head.x - dirX * camDistance;
+
+    const targetZ =
+        head.z - dirZ * camDistance;
+
+    const targetY = camHeight;
+
+    camera.position.x +=
+        (targetX - camera.position.x) * 0.08;
+
+    camera.position.y +=
+        (targetY - camera.position.y) * 0.08;
+
+    camera.position.z +=
+        (targetZ - camera.position.z) * 0.08;
+
+    const lookX =
+        head.x + dirX * 10;
+
+    const lookZ =
+        head.z + dirZ * 10;
+
+    camera.lookAt(
+        lookX,
+        0,
+        lookZ
+    );
 }
-
-camera.position.set(0, 20, -22);
-camera.lookAt(0, 0, 0);
-
 animate();
 
 window.addEventListener("resize", () => {
