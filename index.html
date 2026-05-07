@@ -1991,6 +1991,80 @@ function animate(){
         camera
     );
 }
+
+camera.position.set(
+0,
+20,
+-22
+);
+
+camera.lookAt(
+0,
+0,
+0
+);
+
+animate();
+
+window.addEventListener("resize", () => {
+
+    camera.aspect =
+    innerWidth / innerHeight;
+
+    camera.updateProjectionMatrix();
+
+    renderer.setSize(
+        innerWidth,
+        innerHeight
+    );
+});
+
+window.addEventListener("beforeunload", () => {
+
+    removePlayerOnlineRanking();
+
+});
+
+</script>
+
+<script type="module">
+
+import {
+    initializeApp
+}
+from
+"https://www.gstatic.com/firebasejs/12.12.1/firebase-app.js";
+
+import {
+    getDatabase,
+    ref,
+    set,
+    get,
+    onValue,
+    remove,
+    update,
+    onDisconnect
+}
+from
+"https://www.gstatic.com/firebasejs/12.12.1/firebase-database.js";
+
+const firebaseConfig = {
+
+    apiKey:
+    "AIzaSyDyM6_nMlHtle4Z030VmLS7_ZPm4Cw4ww8",
+
+    authDomain:
+    "slither3d-54683.firebaseapp.com",
+
+    databaseURL:
+    "https://slither3d-54683-default-rtdb.firebaseio.com",
+
+    projectId:
+    "slither3d-54683",
+
+    storageBucket:
+    "slither3d-54683.firebasestorage.app",
+
     messagingSenderId:
     "747917317954",
 
@@ -1999,6 +2073,7 @@ function animate(){
 };
 
 const app = initializeApp(firebaseConfig);
+
 const db = getDatabase(app);
 
 window.firebaseDB = db;
